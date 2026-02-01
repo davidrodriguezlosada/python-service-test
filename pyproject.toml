@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "python-service-test"
+version = "1.0.0"
+description = "Python service with ECS logging and Kafka integration"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["*"]

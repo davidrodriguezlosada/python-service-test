@@ -1,0 +1,117 @@
+version: '3.8'
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    hostname: zookeeper
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - kafka-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    hostname: kafka
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "9101:9101"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_JMX_PORT: 9101
+      KAFKA_JMX_HOSTNAME: localhost
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+    networks:
+      - kafka-network
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    depends_on:
+      - kafka
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+    networks:
+      - kafka-network
+
+#  python-service:
+#    build: .
+#    container_name: python-service-test
+#    ports:
+#      - "8000:8000"
+#    environment:
+#      DD_SERVICE: python-service-test
+#      DD_ENV: dev
+#      DD_VERSION: 1.0.0
+#      DD_API_KEY: ${DD_API_KEY}
+#      DD_LOGS_INJECTION: true
+#      DD_ENABLED: ${DD_ENABLED:-false}
+#      DD_AGENT_HOST: datadog-agent
+#      DD_TRACE_AGENT_URL: http://datadog-agent:8126
+#      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+#      KAFKA_TOPIC: test-topic
+#      KAFKA_CONSUMER_GROUP: test-group
+#      TAGS_ENV: ${TAGS_ENV:-dev}
+#      TAGS_APPLICATION: ${TAGS_APPLICATION:-python-service-test}
+#      TAGS_SOLUTION: ${TAGS_SOLUTION:-polaris}
+#      TAGS_SERVICE: ${TAGS_SERVICE:-python-service-test}
+#      TAGS_DOMAIN: ${TAGS_DOMAIN:-ecommerce}
+#      TAGS_VERSION: ${TAGS_VERSION:-1.0.0}
+#      TAGS_TRACE: ${TAGS_TRACE:-true}
+#    volumes:
+#      - .:/app
+#    depends_on:
+#      - kafka
+#      - zookeeper
+#    networks:
+#      - kafka-network
+#    logging:
+#      driver: "json-file"
+#      options:
+#        max-size: "10m"
+#        max-file: "3"
+
+  datadog-agent:
+    image: gcr.io/datadoghq/agent:7
+    container_name: dd-agent
+    environment:
+      DD_API_KEY: ${DD_API_KEY}
+      DD_SITE: "datadoghq.eu"
+      DD_DOGSTATSD_NON_LOCAL_TRAFFIC: true
+      DD_ENV: dev
+      DD_LOGS_ENABLED: true
+      DD_LOGS_CONFIG_AUTO_MULTI_LINE_DETECTION: true
+      DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL: true
+      DD_CONTAINER_EXCLUDE_LOGS: "name:dd-agent"
+      DD_AC_INCLUDE: "python-service-test"
+    ports:
+      - "8126:8126"
+    volumes:
+      - /opt/datadog-agent/run:/opt/datadog-agent/run:rw
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /proc/:/host/proc/:ro
+      - /sys/fs/cgroup/:/host/sys/fs/cgroup:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    networks:
+      - kafka-network
+
+networks:
+  kafka-network:
+    driver: bridge
